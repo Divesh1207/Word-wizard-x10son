@@ -1,0 +1,22 @@
+{
+    "manifest_version": 3,
+    "name": "Quick Word Definition",
+    "version": "1.0",
+    "description": "Shows word definitions when text is highlighted",
+    "permissions": [
+        "activeTab"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "css": [
+                "style.css"
+            ]
+        }
+    ]
+}
