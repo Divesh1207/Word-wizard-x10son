@@ -1,8 +1,10 @@
 let isEnabled = true;
-let selectedLanguage = 'en';
+let selectedLanguage = 'en-US';
 let lastSelectedText = '';
 let lastX = 0;
 let lastY = 0;
+let voicesLoaded = false;
+let isSpeaking = false;
 
 const cache = {
   getItem: (key) => {
@@ -67,7 +69,7 @@ async function fetchDefinition(word, language, x, y) {
       const synonyms = data[0].meanings[0].synonyms || [];
       let result;
 
-      if (language !== 'en') {
+      if (language !== 'en-US') {
         const translatedWord = await translateText(word, 'en', language);
         const translatedDefinition = await translateText(definition, 'en', language);
         result = { word: translatedWord, definition: translatedDefinition, synonyms };
@@ -131,15 +133,15 @@ function showPopup(word, definition, x, y, synonyms, language) {
         <span>Enable Extension</span>
       </div>
       <select id="languageSelector">
-        <option value="en">English</option>
-        <option value="hi">Hindi</option>
-        <option value="fr">French</option>
-        <option value="es">Spanish</option>
-        <option value="de">German</option>
-        <option value="ja">Japanese</option>
-        <option value="ko">Korean</option>
-        <option value="ru">Russian</option>
-        <option value="zh">Chinese</option>
+        <option value="en-US">English</option>
+        <option value="hi-IN">Hindi</option>
+        <option value="fr-FR">French</option>
+        <option value="es-ES">Spanish</option>
+        <option value="de-DE">German</option>
+        <option value="ja-JP">Japanese</option>
+        <option value="ko-KR">Korean</option>
+        <option value="ru-RU">Russian</option>
+        <option value="zh-CN">Chinese (Simplified)</option>
       </select>
     </div>
   `;
@@ -150,10 +152,26 @@ function showPopup(word, definition, x, y, synonyms, language) {
   closeButton.addEventListener('click', removeExistingPopup);
 
   const speakWordButton = popup.querySelector('#speak-word');
-  speakWordButton.addEventListener('click', () => speak(word, language));
+  speakWordButton.addEventListener('click', async () => {
+    try {
+      await speak(word, selectedLanguage);
+      showSweetMessage("Word pronounced successfully!");
+    } catch (error) {
+      console.error('Error speaking word:', error);
+      showSweetMessage("Sorry, couldn't pronounce the word. Please try again or check your browser settings.");
+    }
+  });
 
   const speakDefinitionButton = popup.querySelector('#speak-definition');
-  speakDefinitionButton.addEventListener('click', () => speak(definition, language));
+  speakDefinitionButton.addEventListener('click', async () => {
+    try {
+      await speak(definition, selectedLanguage);
+      showSweetMessage("Definition pronounced successfully!");
+    } catch (error) {
+      console.error('Error speaking definition:', error);
+      showSweetMessage("Sorry, couldn't pronounce the definition. Please try again or check your browser settings.");
+    }
+  });
 
   const enableCheckbox = popup.querySelector('#enableExtension');
   enableCheckbox.addEventListener('change', function () {
@@ -168,7 +186,7 @@ function showPopup(word, definition, x, y, synonyms, language) {
 
   const languageSelector = popup.querySelector('#languageSelector');
   languageSelector.value = selectedLanguage;
-  languageSelector.addEventListener('change', function () {
+  languageSelector.addEventListener('change', async function () {
     selectedLanguage = this.value;
     if (lastSelectedText) {
       fetchDefinition(lastSelectedText, selectedLanguage, lastX, lastY);
@@ -204,10 +222,78 @@ function removeExistingPopup() {
   }
 }
 
-function speak(text, language) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = language === 'en' ? 'en-US' : 'es-ES';
-  window.speechSynthesis.speak(utterance);
+function loadVoices() {
+  return new Promise((resolve) => {
+    if (voicesLoaded) {
+      resolve(speechSynthesis.getVoices());
+    } else {
+      speechSynthesis.onvoiceschanged = () => {
+        voicesLoaded = true;
+        resolve(speechSynthesis.getVoices());
+      };
+      // Trigger voice loading in Firefox
+      speechSynthesis.getVoices();
+    }
+  });
+}
+
+function getBestVoice(language) {
+  const voices = speechSynthesis.getVoices();
+
+  // Try to find an exact match
+  let voice = voices.find(v => v.lang.toLowerCase() === language.toLowerCase());
+
+  // If no exact match, try to find a voice that starts with the language code
+  if (!voice) {
+    voice = voices.find(v => v.lang.toLowerCase().startsWith(language.toLowerCase()));
+  }
+
+  // If still no match, fall back to any voice in the same language family
+  if (!voice) {
+    const langFamily = language.split('-')[0];
+    voice = voices.find(v => v.lang.toLowerCase().startsWith(langFamily));
+  }
+
+  // If all else fails, use the first available voice
+  return voice || voices[0];
+}
+
+async function speak(text, language) {
+  return new Promise((resolve, reject) => {
+    if (speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const selectedVoice = getBestVoice(language);
+
+    if (!selectedVoice) {
+      reject(new Error('No suitable voice found'));
+      return;
+    }
+
+    utterance.voice = selectedVoice;
+    utterance.lang = language;
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    utterance.onstart = () => {
+      isSpeaking = true;
+    };
+
+    utterance.onend = () => {
+      isSpeaking = false;
+      resolve();
+    };
+
+    utterance.onerror = (event) => {
+      isSpeaking = false;
+      reject(new Error(`Speech synthesis error: ${event.error}`));
+    };
+
+    speechSynthesis.speak(utterance);
+  });
 }
 
 function showSweetMessage(message) {
@@ -219,6 +305,21 @@ function showSweetMessage(message) {
   setTimeout(() => {
     messageElement.remove();
   }, 3000);
+}
+
+function logAvailableVoices() {
+  const voices = speechSynthesis.getVoices();
+  console.log('Available voices:');
+  voices.forEach(voice => {
+    console.log(`Name: ${voice.name}, Lang: ${voice.lang}`);
+  });
+}
+
+function keepSpeechSynthesisAlive() {
+  if (speechSynthesis.speaking) {
+    speechSynthesis.pause();
+    speechSynthesis.resume();
+  }
 }
 
 window.addEventListener('resize', () => {
@@ -238,3 +339,12 @@ window.addEventListener('resize', () => {
     popup.style.top = `${top}px`;
   }
 });
+
+// Load voices when the script starts
+loadVoices().then(() => {
+  logAvailableVoices();
+  console.log('Voices loaded and logged');
+});
+
+// Call this function every 5 seconds
+setInterval(keepSpeechSynthesisAlive, 5000);
