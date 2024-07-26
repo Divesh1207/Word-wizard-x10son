@@ -1,11 +1,13 @@
 # Introducing "WordWizard" - Your Magical Reading Companion!
 
-![image](https://github.com/user-attachments/assets/cc98fc94-7aeb-458c-b1b6-bae56f2f149d)
+![image](https://github.com/user-attachments/assets/4702b988-868c-4452-8c47-fe9a4e359d42)
+
 
 
 ## Demo Video
 
-https://github.com/user-attachments/assets/cf95a2ea-0d59-45a7-965a-d81b685bae56
+https://github.com/user-attachments/assets/4d8fa495-0ff2-4c59-b3dc-aa64f2da4a51
+
 
 
 
