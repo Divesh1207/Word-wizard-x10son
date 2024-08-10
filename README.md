@@ -22,6 +22,8 @@ So, I developed WordWizard to solve this exact problem. It’s designed to make 
 P.S. Credit goes to Akram for inspiring this tool!
 ## How to load the chrome extension
 
+"Download the repository as a ZIP file and unzip it."
+
 1.Go to chrome://extensions/ in your browser
 
 2.Enable Developer mode
